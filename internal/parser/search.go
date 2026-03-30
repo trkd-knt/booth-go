@@ -59,10 +59,9 @@ func parseSearchFromStructuredData(doc *goquery.Document) *model.SearchResult {
 		}
 		for _, entry := range payload.ItemListElement {
 			item := model.Item{
-				Title:    strings.TrimSpace(entry.Name),
-				URL:      strings.TrimSpace(entry.URL),
-				ID:       parseItemIDFromURL(entry.URL),
-				ShopHost: parseURLHost(entry.URL),
+				Title: strings.TrimSpace(entry.Name),
+				URL:   strings.TrimSpace(entry.URL),
+				ID:    parseItemIDFromURL(entry.URL),
 			}
 			for _, offer := range entry.Offers {
 				if item.Price == 0 {
@@ -140,15 +139,14 @@ func parseSearchItemsFromDOM(doc *goquery.Document) []model.Item {
 		}
 
 		item := model.Item{
-			ID:       parseItemIDFromURL(href),
-			Title:    title,
-			URL:      href,
-			ShopHost: parseURLHost(href),
+			ID:    parseItemIDFromURL(href),
+			Title: title,
+			URL:   href,
 		}
 
 		node := s.Parent()
 		for i := 0; i < 4 && node.Length() > 0; i++ {
-			if item.Price != 0 && item.ShopHost != "" {
+			if item.Price != 0 && item.Shop != nil {
 				break
 			}
 			text := strings.TrimSpace(node.Text())
@@ -158,11 +156,15 @@ func parseSearchItemsFromDOM(doc *goquery.Document) []model.Item {
 					item.PriceText = text
 				}
 			}
-			if item.ShopHost == "" {
+			if item.Shop == nil {
 				node.Find("a").Each(func(_ int, candidate *goquery.Selection) {
 					link, ok := candidate.Attr("href")
-					if ok && parseURLHost(link) != "" && !strings.Contains(link, "/items/") && item.ShopHost == "" {
-						item.ShopHost = parseURLHost(link)
+					host := parseURLHost(link)
+					if ok && host != "" && !strings.Contains(link, "/items/") && item.Shop == nil {
+						item.Shop = &model.ShopPreview{
+							Host: host,
+							URL:  link,
+						}
 					}
 				})
 			}
@@ -170,12 +172,6 @@ func parseSearchItemsFromDOM(doc *goquery.Document) []model.Item {
 		}
 
 		item.IsSoldOut = strings.Contains(strings.ToLower(s.Parent().Text()), "在庫なし")
-		if item.ShopHost != "" {
-			item.Shop = &model.ShopPreview{
-				Host: item.ShopHost,
-				URL:  "https://" + item.ShopHost,
-			}
-		}
 		items = append(items, item)
 		seen[href] = struct{}{}
 	})

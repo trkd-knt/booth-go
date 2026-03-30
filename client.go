@@ -33,6 +33,10 @@ var (
 	ErrTooManyRequests = errors.New("booth: too many requests")
 	// ErrParseFailed はレスポンスの解析に失敗したことを表します。
 	ErrParseFailed = errors.New("booth: parse failed")
+	// ErrItemAvatarsParseFailed は商品詳細の対応アバター補完に失敗したことを表します。
+	ErrItemAvatarsParseFailed = errors.New("booth: item avatars parse failed")
+	// ErrItemDescriptionParseFailed は商品詳細の本文説明抽出に失敗したことを表します。
+	ErrItemDescriptionParseFailed = errors.New("booth: item description parse failed")
 	// ErrRequestFailed は HTTP リクエスト自体に失敗したことを表します。
 	ErrRequestFailed = errors.New("booth: request failed")
 )
@@ -339,15 +343,6 @@ func mapStatusError(resourceKind string, statusCode int) error {
 		}
 		return nil
 	}
-}
-
-func shouldUseRequestedShopHost(actualHost, requestedShopHost string) bool {
-	actualHost = strings.TrimSpace(actualHost)
-	requestedShopHost = strings.TrimSpace(requestedShopHost)
-	if actualHost == "" || requestedShopHost == "" {
-		return false
-	}
-	return actualHost == "booth.pm" && actualHost != requestedShopHost
 }
 
 // wrapRequestError は context 系エラーを保ったままリクエストエラーを包みます。

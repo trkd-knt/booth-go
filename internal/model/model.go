@@ -36,8 +36,11 @@ type Item struct {
 	Price         int
 	PriceText     string
 	ShopHost      string
+	Tags          []string
+	Avatars       []string
 	Images        []string
 	ImageDetails  []Image
+	Summary       string
 	Description   string
 	URL           string
 	IsSoldOut     bool

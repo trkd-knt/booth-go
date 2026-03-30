@@ -25,19 +25,42 @@ func TestGetItem(t *testing.T) {
 	client, err := NewClient(
 		WithHTTPClient(mockHTTPClient{
 			do: func(req *http.Request) (*http.Response, error) {
-				if req.URL.String() != "https://sample.booth.pm/items/12345" {
+				switch req.URL.String() {
+				case "https://booth.pm/ja/items/12345.json":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"id": 12345,
+							"name": "サンプル商品",
+							"description": "説明",
+							"price": "¥ 1,200",
+							"url": "https://booth.pm/ja/items/12345",
+							"is_sold_out": false,
+							"is_adult": false,
+							"wish_lists_count": 42,
+							"category": {"id": 209, "name": "3D衣装"},
+							"shop": {"name": "サンプルショップ", "subdomain": "sample", "thumbnail_url": "https://example.com/thumb.jpg", "url": "https://sample.booth.pm/"},
+							"tags": [{"name": "VRChat"}, {"name": "衣装"}],
+							"images": [
+								{"original": "https://example.com/original.jpg", "resized": "https://example.com/resized.jpg"}
+							]
+						}`)),
+					}, nil
+				case "https://booth.pm/ja/items/12345":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`<!doctype html><html><body>
+							<ul id="variations">
+								<li><div class="variation-name">フルパック - FullPack</div></li>
+								<li><div class="variation-name">ルミナ - LUMINA</div></li>
+								<li><div class="variation-name">ショコラ - Chocolat ※共通素体あり</div></li>
+							</ul>
+							</body></html>`)),
+					}, nil
+				default:
 					t.Fatalf("unexpected url: %s", req.URL.String())
 				}
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`<!doctype html><html><head>
-						<link rel="canonical" href="https://sample.booth.pm/items/12345">
-						<meta property="og:title" content="サンプル商品">
-						<script type="application/ld+json">
-						{"@type":"Product","name":"サンプル商品","url":"https://sample.booth.pm/items/12345","offers":{"price":"1200","availability":"https://schema.org/InStock"}}
-						</script>
-						</head><body><h1>サンプル商品</h1></body></html>`)),
-				}, nil
+				return nil, nil
 			},
 		}),
 	)
@@ -45,38 +68,61 @@ func TestGetItem(t *testing.T) {
 		t.Fatalf("NewClient() error = %v", err)
 	}
 
-	item, err := client.GetItem(context.Background(), "sample.booth.pm", "12345")
+	item, err := client.GetItem(context.Background(), "12345")
 	if err != nil {
 		t.Fatalf("GetItem() error = %v", err)
 	}
 	if item.Title != "サンプル商品" {
 		t.Fatalf("item.Title = %q", item.Title)
 	}
-	if item.PriceText != "1200" {
+	if item.Summary != "説明" {
+		t.Fatalf("item.Summary = %q", item.Summary)
+	}
+	if item.PriceText != "¥ 1,200" {
 		t.Fatalf("item.PriceText = %q", item.PriceText)
+	}
+	if item.Price != 1200 {
+		t.Fatalf("item.Price = %d", item.Price)
+	}
+	if len(item.Tags) != 2 || item.Tags[0] != "VRChat" {
+		t.Fatalf("item.Tags = %#v", item.Tags)
+	}
+	if len(item.Images) != 1 || item.Images[0] != "https://example.com/resized.jpg" {
+		t.Fatalf("item.Images = %#v", item.Images)
+	}
+	if len(item.Avatars) != 3 || item.Avatars[0] != "フルパック - FullPack" || item.Avatars[1] != "ルミナ - LUMINA" || item.Avatars[2] != "ショコラ - Chocolat ※共通素体あり" {
+		t.Fatalf("item.Avatars = %#v", item.Avatars)
 	}
 }
 
-// TestGetItemPrefersRequestedShopHost は item ページが booth.pm URL を返しても要求ショップを優先することを確認します。
-func TestGetItemPrefersRequestedShopHost(t *testing.T) {
+// TestGetItemUsesPayloadShop は item JSON の shop 情報をそのまま利用することを確認します。
+func TestGetItemUsesPayloadShop(t *testing.T) {
 	t.Parallel()
 
 	client, err := NewClient(
 		WithHTTPClient(mockHTTPClient{
 			do: func(req *http.Request) (*http.Response, error) {
-				if req.URL.String() != "https://sample.booth.pm/items/12345" {
+				switch req.URL.String() {
+				case "https://booth.pm/ja/items/12345.json":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"id": 12345,
+							"name": "サンプル商品",
+							"url": "https://booth.pm/ja/items/12345",
+							"price": "¥ 1,200",
+							"shop": {"name": "サンプルショップ", "url": "https://booth.pm/"}
+						}`)),
+					}, nil
+				case "https://booth.pm/ja/items/12345":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`<!doctype html><html><body></body></html>`)),
+					}, nil
+				default:
 					t.Fatalf("unexpected url: %s", req.URL.String())
 				}
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body: io.NopCloser(strings.NewReader(`<!doctype html><html><head>
-						<link rel="canonical" href="https://booth.pm/ja/items/12345">
-						<meta property="og:title" content="サンプル商品">
-						<script type="application/ld+json">
-						{"@type":"Product","name":"サンプル商品","url":"https://booth.pm/ja/items/12345","shop":{"host":"booth.pm","url":"https://booth.pm"}}
-						</script>
-						</head><body><h1>サンプル商品</h1></body></html>`)),
-				}, nil
+				return nil, nil
 			},
 		}),
 	)
@@ -84,17 +130,17 @@ func TestGetItemPrefersRequestedShopHost(t *testing.T) {
 		t.Fatalf("NewClient() error = %v", err)
 	}
 
-	item, err := client.GetItem(context.Background(), "sample.booth.pm", "12345")
+	item, err := client.GetItem(context.Background(), "12345")
 	if err != nil {
 		t.Fatalf("GetItem() error = %v", err)
 	}
-	if item.URL != "https://sample.booth.pm/items/12345" {
+	if item.URL != "https://booth.pm/ja/items/12345" {
 		t.Fatalf("item.URL = %q", item.URL)
 	}
-	if item.ShopHost != "sample.booth.pm" {
+	if item.ShopHost != "booth.pm" {
 		t.Fatalf("item.ShopHost = %q", item.ShopHost)
 	}
-	if item.Shop == nil || item.Shop.Host != "sample.booth.pm" || item.Shop.URL != "https://sample.booth.pm" {
+	if item.Shop == nil || item.Shop.Host != "booth.pm" || item.Shop.URL != "https://booth.pm/" {
 		t.Fatalf("item.Shop = %+v", item.Shop)
 	}
 }
@@ -117,9 +163,69 @@ func TestGetItemNotFound(t *testing.T) {
 		t.Fatalf("NewClient() error = %v", err)
 	}
 
-	_, err = client.GetItem(context.Background(), "sample.booth.pm", "12345")
+	_, err = client.GetItem(context.Background(), "12345")
 	if !errors.Is(err, ErrItemNotFound) {
 		t.Fatalf("GetItem() error = %v, want ErrItemNotFound", err)
+	}
+}
+
+func TestGetItemDescription(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithHTTPClient(mockHTTPClient{
+			do: func(req *http.Request) (*http.Response, error) {
+				if req.URL.String() != "https://booth.pm/ja/items/12345" {
+					t.Fatalf("unexpected url: %s", req.URL.String())
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`<!doctype html><html><body><article>
+						<section class="main-info-column">
+							<div class="js-market-item-detail-description description">
+								<p class="autolink whitespace-pre-line">冒頭本文</p>
+							</div>
+						</section>
+						<section class="shop__text"><h2>見出し</h2><p class="js-autolink whitespace-pre-line">後続本文</p><p class="js-autolink whitespace-pre-line">補足段落</p></section>
+						<div class="shop__text"><p>無関係</p></div>
+						</article></body></html>`)),
+				}, nil
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	description, err := client.GetItemDescription(context.Background(), "12345")
+	if err != nil {
+		t.Fatalf("GetItemDescription() error = %v", err)
+	}
+	if !strings.Contains(description, "冒頭本文") || !strings.Contains(description, "見出し\n後続本文") {
+		t.Fatalf("description = %q", description)
+	}
+}
+
+func TestGetItemDescriptionParseFailed(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithHTTPClient(mockHTTPClient{
+			do: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`<!doctype html><html><body></body></html>`)),
+				}, nil
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.GetItemDescription(context.Background(), "12345")
+	if !errors.Is(err, ErrItemDescriptionParseFailed) {
+		t.Fatalf("GetItemDescription() error = %v, want ErrItemDescriptionParseFailed", err)
 	}
 }
 
@@ -160,6 +266,9 @@ func TestSearchItems(t *testing.T) {
 	}
 	if result.Items[0].Shop == nil || result.Items[0].Shop.Host != "sample.booth.pm" {
 		t.Fatalf("result.Items[0].Shop = %+v", result.Items[0].Shop)
+	}
+	if result.Items[0].ShopHost != "" {
+		t.Fatalf("result.Items[0].ShopHost = %q, want empty", result.Items[0].ShopHost)
 	}
 }
 

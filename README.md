@@ -1,7 +1,7 @@
 # booth-go
 
 `booth-go` は BOOTH の商品詳細、ショップ情報、全体検索結果を取得するための Go ライブラリです。  
-スクレイピング対象の HTML から、商品情報や検索結果を Go の構造体として扱える形に変換します。
+商品詳細は JSON エンドポイントを優先し、説明文や対応アバターのような補足情報だけを HTML から補完します。
 
 詳細な API は [docs/api-reference.md](/home/trkdknt/git/Cozym/booth-go/docs/api-reference.md) を参照してください。
 
@@ -45,7 +45,11 @@ func main() {
 	}
 
 	for _, item := range result.Items {
-		fmt.Printf("%s (%s) %d\n", item.Title, item.ShopHost, item.Price)
+		shopHost := ""
+		if item.Shop != nil {
+			shopHost = item.Shop.Host
+		}
+		fmt.Printf("%s (%s) %d\n", item.Title, shopHost, item.Price)
 	}
 }
 ```

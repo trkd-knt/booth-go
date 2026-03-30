@@ -28,7 +28,8 @@ client, err := booth.NewClient(
 
 Primary methods:
 
-- `GetItem(ctx, shopHost, itemID)`
+- `GetItem(ctx, itemID)`
+- `GetItemDescription(ctx, itemID)`
 - `SearchItems(ctx, opts)`
 - `GetShop(ctx, shopHost)`
 

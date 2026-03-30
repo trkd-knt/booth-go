@@ -2,102 +2,95 @@ package parser
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// TestParseItemPage は JSON-LD を優先して商品情報を抽出できることを確認します。
-func TestParseItemPage(t *testing.T) {
+func TestParseItemDescriptionPage(t *testing.T) {
 	t.Parallel()
 
-	file, err := os.Open(filepath.Join("testdata", "item.html"))
-	if err != nil {
-		t.Fatalf("open fixture: %v", err)
-	}
-	defer file.Close()
+	raw := `<!doctype html><html><body><article>
+		<section class="main-info-column">
+			<div class="js-market-item-detail-description description">
+				<p class="autolink whitespace-pre-line">冒頭本文</p>
+			</div>
+		</section>
+	</article></body></html>`
 
-	item, err := ParseItemPage(file)
+	description, err := ParseItemDescriptionPage(strings.NewReader(raw))
 	if err != nil {
-		t.Fatalf("ParseItemPage() error = %v", err)
+		t.Fatalf("ParseItemDescriptionPage() error = %v", err)
 	}
 
-	if item.ID != "12345" {
-		t.Fatalf("item.ID = %q, want %q", item.ID, "12345")
-	}
-	if item.ShopHost != "sample.booth.pm" {
-		t.Fatalf("item.ShopHost = %q", item.ShopHost)
-	}
-	if item.Title != "サンプル商品" {
-		t.Fatalf("item.Title = %q", item.Title)
-	}
-	if item.Price != 1200 {
-		t.Fatalf("item.Price = %d", item.Price)
-	}
-	if item.PriceText != "1200" {
-		t.Fatalf("item.PriceText = %q", item.PriceText)
-	}
-	if item.Category == nil || item.Category.ID != 212 || item.Category.Name != "VRoid" {
-		t.Fatalf("item.Category = %+v", item.Category)
-	}
-	if item.Shop == nil || item.Shop.Name != "サンプルショップ" || item.Shop.Host != "sample.booth.pm" {
-		t.Fatalf("item.Shop = %+v", item.Shop)
-	}
-	if item.Likes != 42 {
-		t.Fatalf("item.Likes = %d", item.Likes)
-	}
-	if len(item.Downloadables) != 1 {
-		t.Fatalf("len(item.Downloadables) = %d, want 1", len(item.Downloadables))
-	}
-	if len(item.ImageDetails) != 2 {
-		t.Fatalf("len(item.ImageDetails) = %d, want 2", len(item.ImageDetails))
-	}
-	if item.IsSoldOut {
-		t.Fatalf("item.IsSoldOut = true, want false")
+	if !strings.Contains(description, "冒頭本文") {
+		t.Fatalf("description = %q", description)
 	}
 }
 
-// TestParseItemPageDOMFallback は構造化データが無い場合でも DOM から抽出できることを確認します。
-func TestParseItemPageDOMFallback(t *testing.T) {
+func TestParseItemDescriptionPageIncludesSupplementalSections(t *testing.T) {
 	t.Parallel()
 
-	file, err := os.Open(filepath.Join("testdata", "item_dom.html"))
-	if err != nil {
-		t.Fatalf("open fixture: %v", err)
-	}
-	defer file.Close()
+	raw := `<!doctype html><html><body><article>
+		<section class="main-info-column">
+			<div class="js-market-item-detail-description description">
+				<p class="autolink whitespace-pre-line">冒頭本文</p>
+			</div>
+		</section>
+		<section class="shop__text">
+			<h2>見出し</h2>
+			<p class="js-autolink whitespace-pre-line">後続本文</p>
+			<p class="js-autolink whitespace-pre-line">補足段落</p>
+		</section>
+	</article></body></html>`
 
-	item, err := ParseItemPage(file)
+	description, err := ParseItemDescriptionPage(strings.NewReader(raw))
 	if err != nil {
-		t.Fatalf("ParseItemPage() error = %v", err)
+		t.Fatalf("ParseItemDescriptionPage() error = %v", err)
 	}
 
-	if item.Title != "DOM商品" {
-		t.Fatalf("item.Title = %q", item.Title)
+	if !strings.Contains(description, "冒頭本文") {
+		t.Fatalf("description = %q", description)
 	}
-	if item.Price != 980 {
-		t.Fatalf("item.Price = %d", item.Price)
+	if !strings.Contains(description, "見出し\n後続本文") {
+		t.Fatalf("description = %q", description)
 	}
-	if !item.IsSoldOut {
-		t.Fatalf("item.IsSoldOut = false, want true")
+	if !strings.Contains(description, "補足段落") {
+		t.Fatalf("description = %q", description)
 	}
 }
 
-// TestParseItemPageNoTitle はタイトルが無い場合に失敗することを確認します。
-func TestParseItemPageNoTitle(t *testing.T) {
+func TestParseItemDescriptionPageNotFound(t *testing.T) {
 	t.Parallel()
 
-	file, err := os.Open(filepath.Join("testdata", "item_invalid.html"))
-	if err != nil {
-		t.Fatalf("open fixture: %v", err)
-	}
-	defer file.Close()
-
-	_, err = ParseItemPage(file)
+	_, err := ParseItemDescriptionPage(strings.NewReader(`<!doctype html><html><body></body></html>`))
 	if err == nil {
-		t.Fatal("ParseItemPage() error = nil, want error")
+		t.Fatal("ParseItemDescriptionPage() error = nil, want error")
 	}
 	if !errors.Is(err, err) {
-		t.Fatalf("ParseItemPage() error = %v", err)
+		t.Fatalf("ParseItemDescriptionPage() error = %v", err)
+	}
+}
+
+func TestParseItemAvatarsPage(t *testing.T) {
+	t.Parallel()
+
+	raw := `<!doctype html><html><body>
+		<ul id="variations">
+			<li><div class="variation-name">フルパック - FullPack</div></li>
+			<li><div class="variation-name">ルミナ - LUMINA</div></li>
+			<li><div class="variation-name">ショコラ - Chocolat ※共通素体あり</div></li>
+		</ul>
+	</body></html>`
+
+	avatars, err := ParseItemAvatarsPage(strings.NewReader(raw))
+	if err != nil {
+		t.Fatalf("ParseItemAvatarsPage() error = %v", err)
+	}
+
+	if len(avatars) != 3 {
+		t.Fatalf("len(avatars) = %d, want 3", len(avatars))
+	}
+	if avatars[0] != "フルパック - FullPack" || avatars[1] != "ルミナ - LUMINA" || avatars[2] != "ショコラ - Chocolat ※共通素体あり" {
+		t.Fatalf("avatars = %#v", avatars)
 	}
 }

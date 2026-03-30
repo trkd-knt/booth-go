@@ -16,9 +16,13 @@
 
 ## Public Methods
 
-### `GetItem(ctx context.Context, shopHost, itemID string) (*Item, error)`
+### `GetItem(ctx context.Context, itemID string) (*Item, error)`
 
-ショップホストと商品 ID を指定して商品詳細を取得します。
+商品 ID を指定して商品詳細を取得します。
+
+### `GetItemDescription(ctx context.Context, itemID string) (string, error)`
+
+商品 ID を指定して HTML 上の全文説明を取得します。
 
 ### `SearchItems(ctx context.Context, opts SearchOptions) (*SearchResult, error)`
 
@@ -109,6 +113,12 @@ const (
 - `IsAdult`
 - `Likes`
 - `Downloadables`
+
+補足:
+
+- `GetItem` は JSON エンドポイントを基準に返却します
+- `GetItemDescription` は HTML 本文抽出専用です
+- `SearchItems` の `Items` では `ShopHost` は保証せず、ショップ情報がある場合は `Shop` を参照します
 
 ### `Shop`
 
