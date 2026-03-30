@@ -27,6 +27,8 @@ var (
 	ErrItemNotFound = errors.New("booth: item not found")
 	// ErrShopNotFound はショップが見つからなかったことを表します。
 	ErrShopNotFound = errors.New("booth: shop not found")
+	// ErrSearchNotFound は検索結果ページが見つからなかったことを表します。
+	ErrSearchNotFound = errors.New("booth: search not found")
 	// ErrTooManyRequests は BOOTH 側からレート超過を返されたことを表します。
 	ErrTooManyRequests = errors.New("booth: too many requests")
 	// ErrParseFailed はレスポンスの解析に失敗したことを表します。
@@ -325,6 +327,9 @@ func mapStatusError(resourceKind string, statusCode int) error {
 		if resourceKind == "shop" {
 			return ErrShopNotFound
 		}
+		if resourceKind == "search" {
+			return ErrSearchNotFound
+		}
 		return ErrItemNotFound
 	case http.StatusTooManyRequests:
 		return ErrTooManyRequests
@@ -334,6 +339,15 @@ func mapStatusError(resourceKind string, statusCode int) error {
 		}
 		return nil
 	}
+}
+
+func shouldUseRequestedShopHost(actualHost, requestedShopHost string) bool {
+	actualHost = strings.TrimSpace(actualHost)
+	requestedShopHost = strings.TrimSpace(requestedShopHost)
+	if actualHost == "" || requestedShopHost == "" {
+		return false
+	}
+	return actualHost == "booth.pm" && actualHost != requestedShopHost
 }
 
 // wrapRequestError は context 系エラーを保ったままリクエストエラーを包みます。

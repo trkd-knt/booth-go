@@ -3,6 +3,7 @@ package booth
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/trkd-knt/booth-go/internal/parser"
 )
@@ -24,11 +25,20 @@ func (c *Client) GetItem(ctx context.Context, shopHost, itemID string) (*Item, e
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrParseFailed, err)
 	}
-	if item.URL == "" {
+	if item.URL == "" || shouldUseRequestedShopHost(parseURLHost(item.URL), shopHost) {
 		item.URL = rawURL
 	}
-	if item.ShopHost == "" {
+	if item.ShopHost == "" || shouldUseRequestedShopHost(item.ShopHost, shopHost) {
 		item.ShopHost = shopHost
+	}
+	if item.Shop == nil {
+		item.Shop = &ShopPreview{}
+	}
+	if item.Shop.Host == "" || shouldUseRequestedShopHost(item.Shop.Host, shopHost) {
+		item.Shop.Host = shopHost
+	}
+	if item.Shop.URL == "" || shouldUseRequestedShopHost(parseURLHost(item.Shop.URL), shopHost) {
+		item.Shop.URL = "https://" + shopHost
 	}
 
 	return item, nil
@@ -102,4 +112,12 @@ func buildShopURL(shopHost string) (string, error) {
 		return "", fmt.Errorf("%w: shop host must not be empty", ErrRequestFailed)
 	}
 	return "https://" + shopHost, nil
+}
+
+func parseURLHost(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Host
 }

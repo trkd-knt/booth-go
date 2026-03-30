@@ -57,6 +57,48 @@ func TestGetItem(t *testing.T) {
 	}
 }
 
+// TestGetItemPrefersRequestedShopHost は item ページが booth.pm URL を返しても要求ショップを優先することを確認します。
+func TestGetItemPrefersRequestedShopHost(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithHTTPClient(mockHTTPClient{
+			do: func(req *http.Request) (*http.Response, error) {
+				if req.URL.String() != "https://sample.booth.pm/items/12345" {
+					t.Fatalf("unexpected url: %s", req.URL.String())
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`<!doctype html><html><head>
+						<link rel="canonical" href="https://booth.pm/ja/items/12345">
+						<meta property="og:title" content="サンプル商品">
+						<script type="application/ld+json">
+						{"@type":"Product","name":"サンプル商品","url":"https://booth.pm/ja/items/12345","shop":{"host":"booth.pm","url":"https://booth.pm"}}
+						</script>
+						</head><body><h1>サンプル商品</h1></body></html>`)),
+				}, nil
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	item, err := client.GetItem(context.Background(), "sample.booth.pm", "12345")
+	if err != nil {
+		t.Fatalf("GetItem() error = %v", err)
+	}
+	if item.URL != "https://sample.booth.pm/items/12345" {
+		t.Fatalf("item.URL = %q", item.URL)
+	}
+	if item.ShopHost != "sample.booth.pm" {
+		t.Fatalf("item.ShopHost = %q", item.ShopHost)
+	}
+	if item.Shop == nil || item.Shop.Host != "sample.booth.pm" || item.Shop.URL != "https://sample.booth.pm" {
+		t.Fatalf("item.Shop = %+v", item.Shop)
+	}
+}
+
 // TestGetItemNotFound は 404 が商品未検出へ変換されることを確認します。
 func TestGetItemNotFound(t *testing.T) {
 	t.Parallel()
@@ -328,6 +370,30 @@ func TestSearchItemsTooManyRequests(t *testing.T) {
 	_, err = client.SearchItems(context.Background(), SearchOptions{Query: "sample"})
 	if !errors.Is(err, ErrTooManyRequests) {
 		t.Fatalf("SearchItems() error = %v, want ErrTooManyRequests", err)
+	}
+}
+
+// TestSearchItemsNotFound は 404 が検索未検出へ変換されることを確認します。
+func TestSearchItemsNotFound(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(
+		WithHTTPClient(mockHTTPClient{
+			do: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader("not found")),
+				}, nil
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	_, err = client.SearchItems(context.Background(), SearchOptions{Query: "sample"})
+	if !errors.Is(err, ErrSearchNotFound) {
+		t.Fatalf("SearchItems() error = %v, want ErrSearchNotFound", err)
 	}
 }
 
