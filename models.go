@@ -1,65 +1,65 @@
 package booth
 
-import "github.com/trkd-knt/booth-go/internal/model"
+import "github.com/trkd-knt/booth-go/internal/domain"
 
 // Item は BOOTH の商品情報を表します。
-type Item = model.Item
+type Item = domain.Item
 
 // Image は商品画像を表します。
-type Image = model.Image
+type Image = domain.Image
 
 // Category は商品カテゴリを表します。
-type Category = model.Category
+type Category = domain.Category
 
 // ShopPreview は商品に紐づくショップ概要を表します。
-type ShopPreview = model.ShopPreview
+type ShopPreview = domain.ShopPreview
 
 // Downloadable はダウンロード可能なファイル情報を表します。
-type Downloadable = model.Downloadable
+type Downloadable = domain.Downloadable
 
 // Shop は BOOTH のショップ情報を表します。
-type Shop = model.Shop
+type Shop = domain.Shop
 
 // SearchOptions は BOOTH 全体検索の条件を表します。
-type SearchOptions = model.SearchOptions
+type SearchOptions = domain.SearchOptions
 
 // Sort は BOOTH の検索ソート条件を表します。
-type Sort = model.Sort
+type Sort = domain.Sort
 
 // ItemType は BOOTH の商品種別フィルタです。
-type ItemType = model.ItemType
+type ItemType = domain.ItemType
 
 // AdultFilter は BOOTH の成人向けフィルタです。
-type AdultFilter = model.AdultFilter
+type AdultFilter = domain.AdultFilter
 
 // SearchResult は BOOTH 全体検索の結果を表します。
-type SearchResult = model.SearchResult
+type SearchResult = domain.SearchResult
 
 const (
 	// SortDefault は BOOTH 側の既定ソートを利用します。
-	SortDefault = model.SortDefault
+	SortDefault = domain.SortDefault
 	// SortNewest は新着順を表します。
-	SortNewest = model.SortNewest
+	SortNewest = domain.SortNewest
 	// SortPopular は人気順を表します。
-	SortPopular = model.SortPopular
+	SortPopular = domain.SortPopular
 	// SortPriceAsc は価格昇順を表します。
-	SortPriceAsc = model.SortPriceAsc
+	SortPriceAsc = domain.SortPriceAsc
 	// SortPriceDesc は価格降順を表します。
-	SortPriceDesc = model.SortPriceDesc
+	SortPriceDesc = domain.SortPriceDesc
 )
 
 const (
 	// ItemTypeDigital はデジタル商品を表します。
-	ItemTypeDigital = model.ItemTypeDigital
+	ItemTypeDigital = domain.ItemTypeDigital
 	// ItemTypePhysical は物理商品を表します。
-	ItemTypePhysical = model.ItemTypePhysical
+	ItemTypePhysical = domain.ItemTypePhysical
 )
 
 const (
 	// AdultFilterDefault は成人向けフィルタを指定しません。
-	AdultFilterDefault = model.AdultFilterDefault
+	AdultFilterDefault = domain.AdultFilterDefault
 	// AdultFilterOnly は成人向け商品のみを対象にします。
-	AdultFilterOnly = model.AdultFilterOnly
+	AdultFilterOnly = domain.AdultFilterOnly
 	// AdultFilterInclude は成人向け商品を含めます。
-	AdultFilterInclude = model.AdultFilterInclude
+	AdultFilterInclude = domain.AdultFilterInclude
 )

@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/trkd-knt/booth-go/internal/model"
+	"github.com/trkd-knt/booth-go/internal/domain"
 )
 
 // ParseShopPage はショップページ HTML からショップ情報を抽出します。
-func ParseShopPage(reader io.Reader) (*model.Shop, error) {
+func ParseShopPage(reader io.Reader) (*domain.Shop, error) {
 	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		return nil, err
@@ -18,7 +18,7 @@ func ParseShopPage(reader io.Reader) (*model.Shop, error) {
 
 	shop := parseShopFromStructuredData(doc)
 	if shop == nil {
-		shop = &model.Shop{}
+		shop = &domain.Shop{}
 	}
 	fillShopFromDOM(doc, shop)
 
@@ -35,11 +35,11 @@ type shopStructuredData struct {
 	URL  string `json:"url"`
 }
 
-func parseShopFromStructuredData(doc *goquery.Document) *model.Shop {
+func parseShopFromStructuredData(doc *goquery.Document) *domain.Shop {
 	for _, raw := range scriptJSONCandidates(doc) {
 		var single shopStructuredData
 		if decodeJSON(raw, &single) && isStoreType(single.Type) {
-			return &model.Shop{
+			return &domain.Shop{
 				Name: strings.TrimSpace(single.Name),
 				URL:  strings.TrimSpace(single.URL),
 				Host: parseURLHost(single.URL),
@@ -50,7 +50,7 @@ func parseShopFromStructuredData(doc *goquery.Document) *model.Shop {
 		if decodeJSON(raw, &list) {
 			for _, entry := range list {
 				if isStoreType(entry.Type) {
-					return &model.Shop{
+					return &domain.Shop{
 						Name: strings.TrimSpace(entry.Name),
 						URL:  strings.TrimSpace(entry.URL),
 						Host: parseURLHost(entry.URL),
@@ -66,7 +66,7 @@ func isStoreType(value string) bool {
 	return strings.EqualFold(value, "store") || strings.EqualFold(value, "organization")
 }
 
-func fillShopFromDOM(doc *goquery.Document, shop *model.Shop) {
+func fillShopFromDOM(doc *goquery.Document, shop *domain.Shop) {
 	if shop.URL == "" {
 		shop.URL = canonicalURL(doc)
 	}

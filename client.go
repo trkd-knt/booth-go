@@ -7,11 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"time"
 
-	"github.com/trkd-knt/booth-go/internal/model"
+	"github.com/trkd-knt/booth-go/internal/boothhttp"
+	"github.com/trkd-knt/booth-go/internal/domain"
 	"golang.org/x/time/rate"
 )
 
@@ -60,7 +60,7 @@ type Option func(*Client) error
 
 // NewClient はデフォルト設定を持つ Client を生成します。
 func NewClient(opts ...Option) (*Client, error) {
-	searchBaseURL, err := buildSearchBaseURL(defaultLang)
+	searchBaseURL, err := boothhttp.BuildSearchBaseURL(defaultLang)
 	if err != nil {
 		return nil, fmt.Errorf("%w: build default search url: %v", ErrRequestFailed, err)
 	}
@@ -95,7 +95,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		client.lang = defaultLang
 	}
 	if client.searchBaseURL == nil {
-		client.searchBaseURL, err = buildSearchBaseURL(client.lang)
+		client.searchBaseURL, err = boothhttp.BuildSearchBaseURL(client.lang)
 		if err != nil {
 			return nil, fmt.Errorf("%w: build search url: %v", ErrRequestFailed, err)
 		}
@@ -187,7 +187,7 @@ func WithLang(lang string) Option {
 		}
 		c.lang = lang
 
-		searchBaseURL, err := buildSearchBaseURL(lang)
+		searchBaseURL, err := boothhttp.BuildSearchBaseURL(lang)
 		if err != nil {
 			return fmt.Errorf("%w: build search url: %v", ErrRequestFailed, err)
 		}
@@ -198,19 +198,11 @@ func WithLang(lang string) Option {
 
 // doGet は GET リクエストを実行してレスポンスボディを返します。
 func (c *Client) doGet(ctx context.Context, rawURL string, resourceKind string) (io.ReadCloser, error) {
-	if err := c.limiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	resp, err := boothhttp.ExecuteGET(ctx, c.httpClient, c.limiter, c.userAgent, c.lang, rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("%w: build request: %v", ErrRequestFailed, err)
-	}
-	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("Accept-Language", c.lang)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
+		if _, ok := err.(*url.Error); !ok && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("%w: build request: %v", ErrRequestFailed, err)
+		}
 		return nil, wrapRequestError(err)
 	}
 
@@ -220,66 +212,6 @@ func (c *Client) doGet(ctx context.Context, rawURL string, resourceKind string) 
 	}
 
 	return resp.Body, nil
-}
-
-// newSearchURL は検索条件から検索 URL を組み立てます。
-func (c *Client) newSearchURL(opts SearchOptions) (string, error) {
-	if err := validateSearchOptions(opts); err != nil {
-		return "", err
-	}
-
-	base := *c.searchBaseURL
-	if opts.Category != "" {
-		base.Path = buildBrowsePath(c.lang, opts.Category)
-	} else {
-		base.Path = buildSearchPath(c.lang)
-	}
-
-	query := base.Query()
-	if opts.Query != "" {
-		query.Set("q", opts.Query)
-	}
-	for _, word := range opts.ExceptWords {
-		word = strings.TrimSpace(word)
-		if word == "" {
-			continue
-		}
-		query.Add("except_words[]", word)
-	}
-	for _, tag := range opts.Tags {
-		tag = strings.TrimSpace(tag)
-		if tag == "" {
-			continue
-		}
-		query.Add("tags[]", tag)
-	}
-	if opts.Event != "" {
-		query.Set("event", opts.Event)
-	}
-	if opts.Type != "" {
-		query.Set("type", string(opts.Type))
-	}
-	if opts.Adult != "" {
-		query.Set("adult", string(opts.Adult))
-	}
-	if opts.MinPrice > 0 {
-		query.Set("min_price", fmt.Sprintf("%d", opts.MinPrice))
-	}
-	if opts.MaxPrice > 0 {
-		query.Set("max_price", fmt.Sprintf("%d", opts.MaxPrice))
-	}
-	if opts.Sort != SortDefault {
-		query.Set("sort", string(opts.Sort))
-	}
-	if opts.Page > 1 {
-		query.Set("page", fmt.Sprintf("%d", opts.Page))
-	}
-	if opts.OnlyAvailable {
-		query.Set("only_available", "1")
-	}
-	base.RawQuery = query.Encode()
-
-	return base.String(), nil
 }
 
 // validateSearchOptions は検索条件を検証します。
@@ -357,22 +289,9 @@ func wrapRequestError(err error) error {
 }
 
 // normalizeSearchOptions は不足値を既定値で補います。
-func normalizeSearchOptions(opts SearchOptions) model.SearchOptions {
+func normalizeSearchOptions(opts SearchOptions) domain.SearchOptions {
 	if opts.Page == 0 {
 		opts.Page = 1
 	}
 	return opts
-}
-
-// buildSearchBaseURL は言語別の検索 URL を構築します。
-func buildSearchBaseURL(lang string) (*url.URL, error) {
-	return url.Parse("https://booth.pm" + buildSearchPath(lang))
-}
-
-func buildSearchPath(lang string) string {
-	return "/" + path.Join(lang, "search")
-}
-
-func buildBrowsePath(lang, category string) string {
-	return "/" + path.Join(lang, "browse", category)
 }

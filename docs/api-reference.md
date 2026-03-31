@@ -6,13 +6,14 @@
 
 `Client` を生成します。
 
-利用可能な主な option:
+主な option:
 
 - `WithLang(lang string)`
 - `WithRateLimit(requestsPerSecond float64)`
 - `WithTimeout(timeout time.Duration)`
 - `WithUserAgent(userAgent string)`
 - `WithHTTPClient(httpClient HTTPClient)`
+- `WithSearchBaseURL(rawURL string)`
 
 ## Public Methods
 
@@ -20,9 +21,14 @@
 
 商品 ID を指定して商品詳細を取得します。
 
+取得元:
+
+- 商品本体: 商品 JSON
+- 対応アバター: 商品 HTML
+
 ### `GetItemDescription(ctx context.Context, itemID string) (string, error)`
 
-商品 ID を指定して HTML 上の全文説明を取得します。
+商品 ID を指定して商品ページ HTML から全文説明を取得します。
 
 ### `SearchItems(ctx context.Context, opts SearchOptions) (*SearchResult, error)`
 
@@ -53,7 +59,9 @@ type SearchOptions struct {
 }
 ```
 
-- `Category` は `/browse/{category}` のパス部分に使われます
+各フィールドは BOOTH 検索クエリに対応します。
+
+- `Category` は `/browse/{category}` のパスに使われます
 - `Query` は `q`
 - `ExceptWords` は `except_words[]`
 - `Tags` は `tags[]`
@@ -62,16 +70,17 @@ type SearchOptions struct {
 - `Adult` は `adult`
 - `MinPrice` は `min_price`
 - `MaxPrice` は `max_price`
+- `OnlyAvailable` は `in_stock`
 
 ### `Sort`
 
 ```go
 const (
-	SortDefault
-	SortNewest
-	SortPopular
-	SortPriceAsc
-	SortPriceDesc
+	SortDefault   Sort = ""
+	SortNewest    Sort = "new"
+	SortPopular   Sort = "popular"
+	SortPriceAsc  Sort = "price_asc"
+	SortPriceDesc Sort = "price_desc"
 )
 ```
 
@@ -79,8 +88,8 @@ const (
 
 ```go
 const (
-	ItemTypeDigital
-	ItemTypePhysical
+	ItemTypeDigital  ItemType = "digital"
+	ItemTypePhysical ItemType = "physical"
 )
 ```
 
@@ -88,51 +97,116 @@ const (
 
 ```go
 const (
-	AdultFilterDefault
-	AdultFilterOnly
-	AdultFilterInclude
+	AdultFilterDefault AdultFilter = ""
+	AdultFilterOnly    AdultFilter = "only"
+	AdultFilterInclude AdultFilter = "include"
 )
 ```
 
 ### `Item`
 
-主なフィールド:
-
-- `ID`
-- `Title`
-- `Price`
-- `PriceText`
-- `ShopHost`
-- `Images`
-- `ImageDetails`
-- `Description`
-- `URL`
-- `IsSoldOut`
-- `Category`
-- `Shop`
-- `IsAdult`
-- `Likes`
-- `Downloadables`
+```go
+type Item struct {
+	ID            string
+	Title         string
+	Price         int
+	PriceText     string
+	ShopHost      string
+	Tags          []string
+	Avatars       []string
+	Images        []string
+	ImageDetails  []Image
+	Summary       string
+	Description   string
+	URL           string
+	IsSoldOut     bool
+	Category      *Category
+	Shop          *ShopPreview
+	IsAdult       bool
+	Likes         int
+	Downloadables []Downloadable
+}
+```
 
 補足:
 
-- `GetItem` は JSON エンドポイントを基準に返却します
-- `GetItemDescription` は HTML 本文抽出専用です
-- `SearchItems` の `Items` では `ShopHost` は保証せず、ショップ情報がある場合は `Shop` を参照します
+- `Summary` は商品 JSON に含まれる説明文です
+- `Description` は `GetItem` では埋まりません
+- 全文説明が必要な場合は `GetItemDescription` を使います
+- `SearchItems` の `Items` では `ShopHost` は保証しません
+- `Avatars` は商品ページ HTML に存在する場合のみ返ります
+
+### `Image`
+
+```go
+type Image struct {
+	Original string
+	Resized  string
+}
+```
+
+### `Category`
+
+```go
+type Category struct {
+	ID   int
+	Name string
+}
+```
+
+### `ShopPreview`
+
+```go
+type ShopPreview struct {
+	Name      string
+	Host      string
+	URL       string
+	Thumbnail string
+}
+```
+
+### `Downloadable`
+
+```go
+type Downloadable struct {
+	FileName      string
+	FileExtension string
+	FileSize      string
+	Name          string
+	URL           string
+}
+```
 
 ### `Shop`
 
-主なフィールド:
-
-- `Name`
-- `Host`
-- `URL`
+```go
+type Shop struct {
+	Name string
+	Host string
+	URL  string
+}
+```
 
 ### `SearchResult`
 
-主なフィールド:
+```go
+type SearchResult struct {
+	Items      []Item
+	Page       int
+	HasNext    bool
+	TotalCount *int
+}
+```
 
-- `Items`
-- `Page`
-- `HasNext`
-- `TotalCount`
+## Errors
+
+主な公開エラー:
+
+- `ErrItemNotFound`
+- `ErrShopNotFound`
+- `ErrSearchNotFound`
+- `ErrTooManyRequests`
+- `ErrParseFailed`
+- `ErrItemAvatarsParseFailed`
+- `ErrItemDescriptionParseFailed`
+- `ErrRequestFailed`

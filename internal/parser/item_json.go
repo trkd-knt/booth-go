@@ -1,4 +1,4 @@
-package booth
+package parser
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/trkd-knt/booth-go/internal/model"
+	"github.com/trkd-knt/booth-go/internal/domain"
 )
 
 type itemJSONResponse struct {
@@ -54,13 +54,13 @@ type itemJSONVariant struct {
 	Price int `json:"price"`
 }
 
-func decodeItemJSON(body io.Reader) (*Item, error) {
+func DecodeItemJSON(body io.Reader) (*domain.Item, error) {
 	var payload itemJSONResponse
 	if err := json.NewDecoder(body).Decode(&payload); err != nil {
 		return nil, err
 	}
 
-	item := &model.Item{
+	item := &domain.Item{
 		ID:          strconv.FormatInt(payload.ID, 10),
 		Title:       strings.TrimSpace(payload.Name),
 		Price:       deriveItemPrice(payload.Price, payload.Variations),
@@ -78,14 +78,14 @@ func decodeItemJSON(body io.Reader) (*Item, error) {
 	}
 
 	if payload.Category != nil {
-		item.Category = &model.Category{
+		item.Category = &domain.Category{
 			ID:   payload.Category.ID,
 			Name: strings.TrimSpace(payload.Category.Name),
 		}
 	}
 
 	if payload.Shop != nil {
-		item.Shop = &model.ShopPreview{
+		item.Shop = &domain.ShopPreview{
 			Name:      strings.TrimSpace(payload.Shop.Name),
 			Host:      buildShopHostFromJSON(payload.Shop.Subdomain, payload.Shop.URL),
 			URL:       strings.TrimSpace(payload.Shop.URL),
@@ -95,7 +95,7 @@ func decodeItemJSON(body io.Reader) (*Item, error) {
 	}
 
 	for _, image := range payload.Images {
-		detail := model.Image{
+		detail := domain.Image{
 			Original: strings.TrimSpace(image.Original),
 			Resized:  strings.TrimSpace(image.Resized),
 		}
@@ -121,12 +121,37 @@ func decodeItemJSON(body io.Reader) (*Item, error) {
 	return item, nil
 }
 
-func buildItemJSONURL(lang, itemID string) (string, error) {
-	itemURL, err := buildItemURL(lang, itemID)
-	if err != nil {
-		return "", err
+func NormalizeItem(item *domain.Item, itemURL string) {
+	if item.URL == "" {
+		item.URL = itemURL
 	}
-	return itemURL + ".json", nil
+	if item.ShopHost == "" {
+		item.ShopHost = parseURLHost(item.URL)
+	}
+	if item.Shop == nil {
+		item.Shop = &domain.ShopPreview{}
+	}
+	if item.Shop.Host == "" {
+		item.Shop.Host = item.ShopHost
+	}
+	if item.Shop.URL == "" && item.Shop.Host != "" {
+		item.Shop.URL = "https://" + item.Shop.Host
+	}
+	if item.ID == "" {
+		if parsed, err := url.Parse(item.URL); err == nil {
+			item.ID = path.Base(parsed.Path)
+		}
+	}
+}
+
+func ValidateDecodedItem(item *domain.Item) error {
+	if item == nil {
+		return fmt.Errorf("decoded item is nil")
+	}
+	if item.ID == "" && item.Title == "" {
+		return fmt.Errorf("decoded item is empty")
+	}
+	return nil
 }
 
 func buildShopHostFromJSON(subdomain, rawURL string) string {
@@ -165,37 +190,4 @@ func parsePriceNumber(priceText string) int {
 		return 0
 	}
 	return value
-}
-
-func normalizeItem(item *Item, itemURL string) {
-	if item.URL == "" {
-		item.URL = itemURL
-	}
-	if item.ShopHost == "" {
-		item.ShopHost = parseURLHost(item.URL)
-	}
-	if item.Shop == nil {
-		item.Shop = &ShopPreview{}
-	}
-	if item.Shop.Host == "" {
-		item.Shop.Host = item.ShopHost
-	}
-	if item.Shop.URL == "" && item.Shop.Host != "" {
-		item.Shop.URL = "https://" + item.Shop.Host
-	}
-	if item.ID == "" {
-		if parsed, err := url.Parse(item.URL); err == nil {
-			item.ID = path.Base(parsed.Path)
-		}
-	}
-}
-
-func validateDecodedItem(item *Item) error {
-	if item == nil {
-		return fmt.Errorf("decoded item is nil")
-	}
-	if item.ID == "" && item.Title == "" {
-		return fmt.Errorf("decoded item is empty")
-	}
-	return nil
 }

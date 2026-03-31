@@ -8,13 +8,13 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/trkd-knt/booth-go/internal/model"
+	"github.com/trkd-knt/booth-go/internal/domain"
 )
 
 var totalCountPattern = regexp.MustCompile(`対象商品\s*([\d,]+)\s*件`)
 
 // ParseSearchPage は検索結果ページ HTML から検索結果を抽出します。
-func ParseSearchPage(reader io.Reader) (*model.SearchResult, error) {
+func ParseSearchPage(reader io.Reader) (*domain.SearchResult, error) {
 	doc, err := goquery.NewDocumentFromReader(reader)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func ParseSearchPage(reader io.Reader) (*model.SearchResult, error) {
 
 	result := parseSearchFromStructuredData(doc)
 	if result == nil {
-		result = &model.SearchResult{}
+		result = &domain.SearchResult{}
 	}
 	fillSearchFromDOM(doc, result)
 
@@ -45,20 +45,20 @@ type searchStructuredData struct {
 	} `json:"itemListElement"`
 }
 
-func parseSearchFromStructuredData(doc *goquery.Document) *model.SearchResult {
+func parseSearchFromStructuredData(doc *goquery.Document) *domain.SearchResult {
 	for _, raw := range scriptJSONCandidates(doc) {
 		var payload searchStructuredData
 		if !decodeJSON(raw, &payload) || !strings.EqualFold(payload.Type, "ItemList") {
 			continue
 		}
 
-		result := &model.SearchResult{}
+		result := &domain.SearchResult{}
 		if payload.NumberOfItems > 0 {
 			total := payload.NumberOfItems
 			result.TotalCount = &total
 		}
 		for _, entry := range payload.ItemListElement {
-			item := model.Item{
+			item := domain.Item{
 				Title: strings.TrimSpace(entry.Name),
 				URL:   strings.TrimSpace(entry.URL),
 				ID:    parseItemIDFromURL(entry.URL),
@@ -80,7 +80,7 @@ func parseSearchFromStructuredData(doc *goquery.Document) *model.SearchResult {
 	return nil
 }
 
-func fillSearchFromDOM(doc *goquery.Document, result *model.SearchResult) {
+func fillSearchFromDOM(doc *goquery.Document, result *domain.SearchResult) {
 	if result.TotalCount == nil {
 		if matches := totalCountPattern.FindStringSubmatch(doc.Text()); len(matches) == 2 {
 			value, err := strconv.Atoi(strings.ReplaceAll(matches[1], ",", ""))
@@ -112,9 +112,9 @@ func parseCurrentPage(doc *goquery.Document) int {
 	return value
 }
 
-func parseSearchItemsFromDOM(doc *goquery.Document) []model.Item {
+func parseSearchItemsFromDOM(doc *goquery.Document) []domain.Item {
 	seen := map[string]struct{}{}
-	items := make([]model.Item, 0)
+	items := make([]domain.Item, 0)
 
 	doc.Find(`a[href*="/items/"]`).Each(func(_ int, s *goquery.Selection) {
 		href, ok := s.Attr("href")
@@ -138,7 +138,7 @@ func parseSearchItemsFromDOM(doc *goquery.Document) []model.Item {
 			return
 		}
 
-		item := model.Item{
+		item := domain.Item{
 			ID:    parseItemIDFromURL(href),
 			Title: title,
 			URL:   href,
@@ -161,7 +161,7 @@ func parseSearchItemsFromDOM(doc *goquery.Document) []model.Item {
 					link, ok := candidate.Attr("href")
 					host := parseURLHost(link)
 					if ok && host != "" && !strings.Contains(link, "/items/") && item.Shop == nil {
-						item.Shop = &model.ShopPreview{
+						item.Shop = &domain.ShopPreview{
 							Host: host,
 							URL:  link,
 						}
